@@ -89,7 +89,7 @@ interface HostileZoneNft {
 
 }
 
-contract HostiledsdgZone is Ownable, IERC20{
+contract HostileZone is Ownable, IERC20{
 
     // pairs in AMM
     mapping (address => bool) public _isPool;
@@ -104,8 +104,8 @@ contract HostiledsdgZone is Ownable, IERC20{
     address public liquidityWallet;
 
     // token 
-    string private _name = "fffggdsZonee";
-    string private _symbol = "eerf";
+    string private _name = "Hostilezone";
+    string private _symbol = "Hzone";
     uint8 private _decimals = 18;
 
     // supply
