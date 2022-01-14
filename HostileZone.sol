@@ -104,8 +104,8 @@ contract HsdasiledsdgZone is Ownable, IERC20{
     address public liquidityWallet;
 
     // token 
-    string private _name = "fffggddsZonee";
-    string private _symbol = "TGGrf";
+    string private _name = "HostilezoneOfficial";
+    string private _symbol = "Hzone";
     uint8 private _decimals = 18;
 
     // supply
