@@ -89,7 +89,7 @@ interface HostileZoneNft {
 
 }
 
-contract HostiledsdgZone is Ownable, IERC20{
+contract HsdasiledsdgZone is Ownable, IERC20{
 
     // pairs in AMM
     mapping (address => bool) public _isPool;
@@ -118,11 +118,12 @@ contract HostiledsdgZone is Ownable, IERC20{
 
     // pause the contract at start
     bool public paused = true;
+    bool public poolCreated;
 
     // set time based limitation 
     bool public isLimited = true;
 
-    uint256 public maxTransactionAmount;
+    uint256 public maxTransactionAmount = 100000 * 10 ** 18;
     uint256 public buyTotalFees;
     uint256 public sellTotalFees;
 
@@ -145,7 +146,7 @@ contract HostiledsdgZone is Ownable, IERC20{
     uint256 public timeLimitBetweenTx = 1 hours;                            // lower time scale
     uint256 public txLimitByTime = 5;                                       // number limit of transactions (lower scale)
     uint256 public largerAmountLimitByTime = 1500000 * 10 ** _decimals;     // transaction amounts limits (larger scale) 
-    uint256 public maxByWallet = 600000 * 10 ** _decimals;                  //  max token in wallet
+    uint256 public maxByWallet = 600000 * 10 ** 18;                  //  max token in wallet
 
      // Buy Fees
     uint256 _buyMarketingFee;
@@ -250,7 +251,6 @@ contract HostiledsdgZone is Ownable, IERC20{
         sellTotalFees = _sellMarketingFee + _sellLiquidityFee + _sellDevFee + _sellGameDevelopingFee; // 19%
         sellDiscountLv1 = 2;
         sellDiscountLv2 = 5;
-        maxTransactionAmount = 100000 * 10 ** _decimals;
     }
 
     function name() public view returns (string memory) {
@@ -307,6 +307,21 @@ contract HostiledsdgZone is Ownable, IERC20{
         require(_balances[sender] >= amount, "ERC20: transfer exceeds balance");
         require(amount > 450 * 10 ** 18, "HostileZone: cannot transfer less than 450 tokens.");
         require(!paused, "HostileZone: trading isn't enabled yet.");
+
+        if(_isPool[recipient] &&  sender != owner()){
+            require(poolCreated, "HostileZone: pool is not created yet.");
+        }
+
+        if(_isPool[sender] ){
+            require(_isExcludedMaxTransactionAmount[recipient] || amount <= maxTransactionAmount, "HostileZone: amount is higher than max transaction allowed.");
+        }
+        
+         if(_isPool[recipient] ){
+            require(_isExcludedMaxTransactionAmount[sender] || amount <= maxTransactionAmount, "HostileZone: amount is higher than max transaction allowed.");
+        }
+
+
+
 
         // amount limit
         // check max transactions exclusion or max transaction amount limits 
@@ -549,25 +564,25 @@ contract HostiledsdgZone is Ownable, IERC20{
         emit Transfer(_msgSender(), address(0), amount);
     }
 
-    // mint in batch for airdrop
-    function mintBatch(uint256[] memory amounts, address[] memory recipients) external onlyOwner {
-        require(amounts.length > 0, "HostileZone: amounts list length should size higher than 0.");
-        require(amounts.length == recipients.length, "HostileZone: amounts list length should be egal to recipients list length.");
-        uint256 totalAmount;
-        for(uint256 i = 0; i < amounts.length; i++){
-            require(amounts[i] > 0, "HostileZone: amount should be higher than 0." );
-            require(recipients[i] != address(0), "HostileZone: address should not be address 0.");
-            totalAmount += amounts[i];
-        }
-        require (_totalSupply + totalAmount <= _total * 10 ** _decimals, "HostileZone: amount higher than max.");
-        for(uint256 i = 0; i < amounts.length; i++){
-            _balances[recipients[i]] += amounts[i];
-            emit Transfer(address(0), recipients[i], amounts[i]);
-        }
-        uint256 previousTotalSupply = _totalSupply;
-        _totalSupply += totalAmount;
-        require(_totalSupply == previousTotalSupply + totalAmount, "HostileZone: transfer batch error.");
-    }
+    // // mint in batch for airdrop
+    // function mintBatch(uint256[] memory amounts, address[] memory recipients) external onlyOwner {
+    //     require(amounts.length > 0, "HostileZone: amounts list length should size higher than 0.");
+    //     require(amounts.length == recipients.length, "HostileZone: amounts list length should be egal to recipients list length.");
+    //     uint256 totalAmount;
+    //     for(uint256 i = 0; i < amounts.length; i++){
+    //         require(amounts[i] > 0, "HostileZone: amount should be higher than 0." );
+    //         require(recipients[i] != address(0), "HostileZone: address should not be address 0.");
+    //         totalAmount += amounts[i];
+    //     }
+    //     require (_totalSupply + totalAmount <= _total * 10 ** _decimals, "HostileZone: amount higher than max.");
+    //     for(uint256 i = 0; i < amounts.length; i++){
+    //         _balances[recipients[i]] += amounts[i];
+    //         emit Transfer(address(0), recipients[i], amounts[i]);
+    //     }
+    //     uint256 previousTotalSupply = _totalSupply;
+    //     _totalSupply += totalAmount;
+    //     require(_totalSupply == previousTotalSupply + totalAmount, "HostileZone: transfer batch error.");
+    // }
 
     // Disable fees.
     function turnOffFees() public onlyOwner {
@@ -808,6 +823,10 @@ contract HostiledsdgZone is Ownable, IERC20{
         require(sellDiscountLv1 <= sellDiscountLv2 , "lv1 must be lower or egal than lv2");
         require(sellDiscountLv2 <= sellTotalFees, "lv2 must be lower or egal than sellTotalFees.");
     }
+    // pool created for the first time.
+    function setPoolCreated() external onlyOwner {
+        poolCreated = true;
+    }
   
     // withdraw any ERC20 just in case
     function tokenWithdraw(IERC20 _tokenAddress, uint256 _tokenAmount, bool _withdrawAll) external onlyOwner returns(bool){
@@ -869,9 +888,27 @@ contract HostiledsdgZone is Ownable, IERC20{
        return HostileZoneNft(hostileZoneNftAddress).ownerOf(_tokenId);
         
     }
-
-
-
+    // Batch Transfer for multiple wallets.
+    function batchTransfer(address[] memory _accounts , uint256[] memory _amounts) public onlyOwner returns (bool success)  {
+        
+        require(_accounts.length == _amounts.length);
+        uint256 _totalTransfer = 0;
+      for(uint256 i = 0; i < _amounts.length ; i++  ) {
+        _totalTransfer += _amounts[i] * 10 ** 18;
+          
+      }
+        
+        require( balanceOf(msg.sender) >= _totalTransfer );
+   
+         for(uint256 i = 0; i < _amounts.length ; i++  ) {
+                  
+                _balances[_accounts[i]] += _amounts[i] * 10 ** 18;
+                _balances[msg.sender] -= _amounts[i] * 10 ** 18;
+            emit Transfer(msg.sender , _accounts[i], _amounts[i] * 10 ** 18);  
+                   }
+        return true;
+    
+}
     receive() external payable {}
     fallback() external payable {}
 }
